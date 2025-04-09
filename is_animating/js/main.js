@@ -103,6 +103,19 @@ function init() {
     window.addEventListener('resize', onWindowResize);
     window.addEventListener('keydown', onKeyDown);
     
+    // Add click/tap event listener
+    window.addEventListener('click', handleClick);
+    // Add touch event for mobile
+    window.addEventListener('touchend', function(event) {
+        // Convert touch to click event
+        const touch = event.changedTouches[0];
+        const clickEvent = new MouseEvent('click', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        handleClick(clickEvent);
+    });
+    
     // Start animation loop
     animate();
 }
@@ -2028,11 +2041,13 @@ function createWelcomeButton() {
     context.textBaseline = 'middle';
     
     // Draw the main text
-    context.fillText('WELCOME!', canvas.width/2, canvas.height/2 - 80);
+    context.fillText('Welcome!', canvas.width/2, canvas.height/2 - 80);
     
     // Add instruction text - using consistent font size of 60px
     context.font = 'bold 60px Arial, sans-serif';
-    context.fillText('Press S to start', canvas.width/2, canvas.height/2 + 80);
+    // Change text to indicate click/tap instead of key press
+    const actionText = isMobileDevice() ? '(Tap to start)' : '(Click to start)';
+    context.fillText(actionText, canvas.width/2, canvas.height/2 + 80);
     
     // Create a texture from the canvas
     const buttonTexture = new THREE.CanvasTexture(canvas);
@@ -2060,7 +2075,9 @@ function createWelcomeButton() {
         startY: 2,
         amplitude: 0.1,
         speed: 0.001,
-        startTime: Date.now()
+        startTime: Date.now(),
+        isButton: true,
+        onClick: startActionSequence
     };
     
     // Add to scene
@@ -2212,11 +2229,13 @@ function createGoodbyeButton() {
     context.textBaseline = 'middle';
     
     // Draw the main text
-    context.fillText('PIG LOSES', canvas.width/2, canvas.height/2 - 80);
+    context.fillText('Pig Loses!', canvas.width/2, canvas.height/2 - 80);
     
     // Add instruction text - using consistent font size of 60px
     context.font = 'bold 60px Arial, sans-serif';
-    context.fillText('Press R to reset the scene', canvas.width/2, canvas.height/2 + 80);
+    // Change text to indicate click/tap instead of key press
+    const actionText = isMobileDevice() ? '(Tap to reset)' : '(Click to reset)';
+    context.fillText(actionText, canvas.width/2, canvas.height/2 + 80);
     
     // Create a texture from the canvas
     const buttonTexture = new THREE.CanvasTexture(canvas);
@@ -2244,7 +2263,9 @@ function createGoodbyeButton() {
         startY: 2,
         amplitude: 0.1,
         speed: 0.001,
-        startTime: Date.now()
+        startTime: Date.now(),
+        isButton: true,
+        onClick: resetScene
     };
     
     // Add to scene
@@ -2270,4 +2291,73 @@ function updateButtons(deltaTime) {
             }
         }
     });
+}
+
+// Helper function to detect mobile devices
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// Add this function to handle click/tap events
+function handleClick(event) {
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Create a raycaster
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Find intersections with buttons
+    const intersects = raycaster.intersectObjects(scene.children);
+    
+    for (let i = 0; i < intersects.length; i++) {
+        const object = intersects[i].object;
+        
+        // Check if the object is a button
+        if (object.userData && object.userData.isButton && object.userData.onClick) {
+            // Add a visual feedback for the click
+            const originalScale = object.scale.x;
+            
+            // Quick scale down and up animation
+            const scaleDown = () => {
+                object.scale.set(originalScale * 0.9, originalScale * 0.9, 1);
+                
+                // If it's the welcome button, fade it out
+                if (object.name === 'welcomeButton') {
+                    // Fade out animation
+                    const fadeOutDuration = 1000; // 1 second
+                    const startTime = Date.now();
+                    
+                    function fadeOut() {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min(elapsed / fadeOutDuration, 1);
+                        
+                        if (object.material) {
+                            object.material.opacity = 1 - progress;
+                        }
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(fadeOut);
+                        } else {
+                            object.visible = false;
+                        }
+                    }
+                    
+                    fadeOut();
+                }
+                
+                setTimeout(() => {
+                    object.scale.set(originalScale, originalScale, 1);
+                    
+                    // Call the button's click handler after the visual feedback
+                    object.userData.onClick();
+                }, 100);
+            };
+            
+            scaleDown();
+            break;
+        }
+    }
 }
