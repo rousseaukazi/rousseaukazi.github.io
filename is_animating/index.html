@@ -20,15 +20,59 @@
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
+        
+        #mobile-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+            padding-top: 40vh;
+            font-size: 24px;
+        }
     </style>
 </head>
 <body>
-    <!-- JS Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <div id="mobile-message">
+        <h1>Sorry, desktop only for now</h1>
+        <p>Please visit on a desktop device for the full experience.</p>
+    </div>
     
-    <!-- Your main JavaScript -->
-    <script src="js/main.js"></script>
+    <script>
+        // Mobile detection
+        function isMobileDevice() {
+            return (window.innerWidth <= 800) || 
+                   (navigator.maxTouchPoints > 0) ||
+                   (navigator.userAgent.match(/Android|iPhone|iPad|iPod|Windows Phone/i));
+        }
+        
+        // Only load Three.js and main.js if not on mobile
+        if (!isMobileDevice()) {
+            // Load Three.js libraries
+            const loadScript = (src) => {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.body.appendChild(script);
+                });
+            };
+            
+            // Load scripts in sequence
+            loadScript("https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js")
+                .then(() => loadScript("https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"))
+                .then(() => loadScript("https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"))
+                .then(() => loadScript("js/main.js"));
+        } else {
+            document.getElementById('mobile-message').style.display = 'block';
+        }
+    </script>
 </body>
 </html>

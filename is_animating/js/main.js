@@ -2247,12 +2247,12 @@ function createGoodbyeButton() {
         side: THREE.DoubleSide
     });
     
-    // Create a plane for the button
-    const buttonGeometry = new THREE.PlaneGeometry(5, 2.5);
+    // Create a plane for the button - make it slightly larger for easier clicking
+    const buttonGeometry = new THREE.PlaneGeometry(5.5, 3); // Increased size
     const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
     
-    // Position the button in front of the camera
-    button.position.set(0, 2, 0);
+    // Position the button in front of the camera and slightly lower
+    button.position.set(0, 1.8, 0); // Lowered position
     button.name = 'goodbyeButton';
     
     // Make sure it faces the camera initially
@@ -2260,12 +2260,34 @@ function createGoodbyeButton() {
     
     // Add a slight floating animation
     button.userData = {
-        startY: 2,
+        startY: 1.8, // Match the new position
         amplitude: 0.1,
         speed: 0.001,
         startTime: Date.now(),
         isButton: true,
-        onClick: resetScene
+        onClick: function() {
+            // Add fade out animation before resetting
+            const fadeOutDuration = 1000; // 1 second
+            const startTime = Date.now();
+            
+            function fadeOut() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / fadeOutDuration, 1);
+                
+                if (button.material) {
+                    button.material.opacity = 1 - progress;
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(fadeOut);
+                } else {
+                    // Once fully faded out, reset the scene
+                    resetScene();
+                }
+            }
+            
+            fadeOut();
+        }
     };
     
     // Add to scene
@@ -2274,7 +2296,7 @@ function createGoodbyeButton() {
     // Add a pulsing effect to make it more noticeable
     addButtonPulseEffect(button);
     
-    console.log("Goodbye button created with red color");
+    console.log("Goodbye button created with red color and improved click detection");
 }
 
 // Add this function to your code
@@ -2309,55 +2331,75 @@ function handleClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
     
-    // Find intersections with buttons
-    const intersects = raycaster.intersectObjects(scene.children);
+    // Find intersections with buttons - use a larger threshold for better detection
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    
+    // Check for button clicks
+    let buttonClicked = false;
     
     for (let i = 0; i < intersects.length; i++) {
         const object = intersects[i].object;
         
-        // Check if the object is a button
-        if (object.userData && object.userData.isButton && object.userData.onClick) {
-            // Add a visual feedback for the click
-            const originalScale = object.scale.x;
-            
-            // Quick scale down and up animation
-            const scaleDown = () => {
-                object.scale.set(originalScale * 0.9, originalScale * 0.9, 1);
+        // Check if the object is a button or has a parent that is a button
+        let targetObject = object;
+        
+        // Look for button in the object or its ancestors
+        while (targetObject) {
+            if (targetObject.userData && targetObject.userData.isButton && targetObject.userData.onClick) {
+                buttonClicked = true;
                 
-                // If it's the welcome button, fade it out
-                if (object.name === 'welcomeButton') {
-                    // Fade out animation
-                    const fadeOutDuration = 1000; // 1 second
-                    const startTime = Date.now();
+                // Add a visual feedback for the click
+                const originalScale = targetObject.scale.x;
+                
+                // Quick scale down and up animation
+                const scaleDown = () => {
+                    targetObject.scale.set(originalScale * 0.9, originalScale * 0.9, 1);
                     
-                    function fadeOut() {
-                        const elapsed = Date.now() - startTime;
-                        const progress = Math.min(elapsed / fadeOutDuration, 1);
+                    // If it's the welcome button, fade it out
+                    if (targetObject.name === 'welcomeButton') {
+                        // Fade out animation
+                        const fadeOutDuration = 1000; // 1 second
+                        const startTime = Date.now();
                         
-                        if (object.material) {
-                            object.material.opacity = 1 - progress;
+                        function fadeOut() {
+                            const elapsed = Date.now() - startTime;
+                            const progress = Math.min(elapsed / fadeOutDuration, 1);
+                            
+                            if (targetObject.material) {
+                                targetObject.material.opacity = 1 - progress;
+                            }
+                            
+                            if (progress < 1) {
+                                requestAnimationFrame(fadeOut);
+                            } else {
+                                targetObject.visible = false;
+                            }
                         }
                         
-                        if (progress < 1) {
-                            requestAnimationFrame(fadeOut);
-                        } else {
-                            object.visible = false;
-                        }
+                        fadeOut();
                     }
                     
-                    fadeOut();
-                }
+                    setTimeout(() => {
+                        targetObject.scale.set(originalScale, originalScale, 1);
+                        
+                        // Call the button's click handler after the visual feedback
+                        targetObject.userData.onClick();
+                    }, 100);
+                };
                 
-                setTimeout(() => {
-                    object.scale.set(originalScale, originalScale, 1);
-                    
-                    // Call the button's click handler after the visual feedback
-                    object.userData.onClick();
-                }, 100);
-            };
+                scaleDown();
+                break;
+            }
             
-            scaleDown();
-            break;
+            // Move up to parent
+            targetObject = targetObject.parent;
         }
+        
+        if (buttonClicked) break;
+    }
+    
+    // Debug click detection
+    if (!buttonClicked) {
+        console.log("Click detected but no button found at coordinates:", mouse.x, mouse.y);
     }
 }
